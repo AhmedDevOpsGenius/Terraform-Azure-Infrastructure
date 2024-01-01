@@ -1,3 +1,8 @@
+resource "azurerm_resource_group" "example" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
 resource "azurerm_virtual_network" "example" {
   name                = var.name
   address_space       = ["10.0.0.0/16"]
@@ -27,6 +32,7 @@ resource "azurerm_network_security_group" "example" {
   resource_group_name = var.resource_group_name
 }
 
+
 resource "azurerm_network_security_rule" "allow_http" {
   name                        = "allow_http"
   priority                    = 100
@@ -37,6 +43,7 @@ resource "azurerm_network_security_rule" "allow_http" {
   destination_port_range      = "80"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.example.name  # Replace with your resource group name
   network_security_group_name = azurerm_network_security_group.example.name
 }
 
@@ -50,5 +57,6 @@ resource "azurerm_network_security_rule" "allow_https" {
   destination_port_range      = "443"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.example.name  # Replace with your resource group name
   network_security_group_name = azurerm_network_security_group.example.name
 }
