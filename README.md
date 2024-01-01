@@ -11,15 +11,21 @@ To initialize and apply the configuration for a specific environment, you can na
 
 # For dev environment
 cd dev
+
 terraform init
+
 terraform apply
 
 # For stage environment
 cd ../stage
+
 terraform init
+
 terraform apply
 
 # For prod environment
 cd ../prod
+
 terraform init
+
 terraform apply
