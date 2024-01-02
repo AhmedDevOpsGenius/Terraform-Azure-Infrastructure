@@ -1,3 +1,5 @@
+# main.tf
+
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
@@ -32,7 +34,6 @@ resource "azurerm_network_security_group" "example" {
   resource_group_name = var.resource_group_name
 }
 
-
 resource "azurerm_network_security_rule" "allow_http" {
   name                        = "allow_http"
   priority                    = 100
@@ -43,7 +44,7 @@ resource "azurerm_network_security_rule" "allow_http" {
   destination_port_range      = "80"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = azurerm_resource_group.example.name  # Replace with your resource group name
+  resource_group_name         = azurerm_resource_group.example.name
   network_security_group_name = azurerm_network_security_group.example.name
 }
 
@@ -57,6 +58,36 @@ resource "azurerm_network_security_rule" "allow_https" {
   destination_port_range      = "443"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = azurerm_resource_group.example.name  # Replace with your resource group name
+  resource_group_name         = azurerm_resource_group.example.name
+  network_security_group_name = azurerm_network_security_group.example.name
+}
+
+# Deny all inbound traffic to private subnets from the internet
+resource "azurerm_network_security_rule" "deny_internet_to_private" {
+  name                        = "deny_internet_to_private"
+  priority                    = 120
+  direction                   = "Inbound"
+  access                      = "Deny"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = "Internet"
+  destination_address_prefix  = azurerm_subnet.private[*].address_prefixes
+  resource_group_name         = azurerm_resource_group.example.name
+  network_security_group_name = azurerm_network_security_group.example.name
+}
+
+# Allow outbound traffic from private subnets to the internet
+resource "azurerm_network_security_rule" "allow_private_to_internet" {
+  name                        = "allow_private_to_internet"
+  priority                    = 130
+  direction                   = "Outbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = azurerm_subnet.private[*].address_prefixes
+  destination_address_prefix  = "Internet"
+  resource_group_name         = azurerm_resource_group.example.name
   network_security_group_name = azurerm_network_security_group.example.name
 }
