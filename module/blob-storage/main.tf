@@ -1,22 +1,3 @@
-provider "azurerm" {
-  features = {}
-}
-
-variable "resource_group_name" {
-  type        = string
-  description = "Name of the resource group"
-}
-
-variable "storage_account_name" {
-  type        = string
-  description = "Name of the storage account"
-}
-
-variable "location" {
-  type        = string
-  description = "Location for the resources"
-}
-
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
@@ -31,15 +12,20 @@ resource "azurerm_storage_account" "example" {
 }
 
 resource "azurerm_storage_container" "example" {
-  name                  = "content"
+  name                  = var.container_name
   storage_account_name  = azurerm_storage_account.example.name
   container_access_type = "private"
 }
 
 resource "azurerm_storage_blob" "example" {
-  name                   = "my-awesome-content.zip"
+  name                   = var.blob_name
   storage_account_name   = azurerm_storage_account.example.name
   storage_container_name = azurerm_storage_container.example.name
   type                   = "Block"
-  source                 = "some-local-file.zip"
+
+  source = var.local_file_path
+}
+
+output "storage_account_id" {
+  value = azurerm_storage_account.example.id
 }
