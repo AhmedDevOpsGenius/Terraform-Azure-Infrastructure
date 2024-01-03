@@ -91,6 +91,14 @@ resource "azurerm_network_security_rule" "allow_private_to_internet" {
   resource_group_name         = azurerm_resource_group.example.name
   network_security_group_name = azurerm_network_security_group.example.name
 }
+
+module "blob_storage" {
+  source               = "../blob-storage"  # Update the path accordingly
+  resource_group_name  = var.blob_storage_resource_group_name
+  storage_account_name = var.blob_storage_account_name
+  location             = var.location
+}
+
 output "public_subnet_ids" {
   value = azurerm_subnet.public[*].id
 }
