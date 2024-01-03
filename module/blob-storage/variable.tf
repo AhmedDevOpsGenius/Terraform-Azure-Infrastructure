@@ -8,7 +8,17 @@ variable "storage_account_name" {
   description = "Name of the storage account"
 }
 
-variable "location" {
+variable "container_name" {
   type        = string
-  description = "Location for the resources"
+  description = "Name of the blob storage container"
+}
+
+variable "blob_name" {
+  type        = string
+  description = "Name of the blob"
+}
+
+variable "local_file_path" {
+  type        = string
+  description = "Local path of the file to upload to the blob"
 }
