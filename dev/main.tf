@@ -25,3 +25,11 @@ module "load_balancer" {
   lb_name             = "devops-amir-dev-lb" 
   public_ip_id        = module.public_ip.public_ip_id  # Update with the appropriate reference to the Public IP module
 }
+module "vmss" {
+  source               = "../module/vmss"
+  resource_group_name  = "devops-amir-dev-rg"  
+  location             = "East US 2"  
+  name                 = "devops-amir-dev" 
+  vmss_name            = "devops-amir-dev-vmss"  
+  vmss_instance_count  = 3  # Update with the desired number of instances in the VMSS
+}
