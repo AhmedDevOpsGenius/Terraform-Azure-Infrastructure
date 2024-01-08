@@ -18,3 +18,10 @@ module "aks_cluster" {
   location            = "North Europe" 
   resource_group_name = "devops-amir-prod-rg"
 }
+module "load_balancer" {
+  source              = "../module/load-balancer"
+  resource_group_name = "devops-amir-dev-rg"  
+  location            = "East US 2"  
+  lb_name             = "devops-amir-dev-lb"
+  public_ip_id        = module.public_ip.public_ip_id  # Update with the appropriate reference to the Public IP module
+}
