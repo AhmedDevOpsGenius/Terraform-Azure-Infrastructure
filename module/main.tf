@@ -1,5 +1,3 @@
-# main.tf
-
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
@@ -64,45 +62,34 @@ resource "azurerm_network_security_rule" "allow_https" {
 
 # Deny all inbound traffic to private subnets from the internet
 resource "azurerm_network_security_rule" "deny_internet_to_private" {
-  name                        = "deny_internet_to_private"
-  priority                    = 120
+  count                       = length(azurerm_subnet.private)
+  name                        = "deny_internet_to_private_${count.index}"
+  priority                    = 120 + count.index
   direction                   = "Inbound"
   access                      = "Deny"
   protocol                    = "*"
   source_port_range           = "*"
   destination_port_range      = "*"
   source_address_prefix       = "Internet"
-  destination_address_prefix  = azurerm_subnet.private[*].address_prefixes
+  destination_address_prefix  = azurerm_subnet.private[count.index].address_prefixes[0]
+
   resource_group_name         = azurerm_resource_group.example.name
   network_security_group_name = azurerm_network_security_group.example.name
 }
 
-# Allow outbound traffic from private subnets to the internet
+# Allow outbound traffic from each private subnet to the internet
 resource "azurerm_network_security_rule" "allow_private_to_internet" {
-  name                        = "allow_private_to_internet"
-  priority                    = 130
+  count                       = length(azurerm_subnet.private)
+  name                        = "allow_private_to_internet_${count.index}"
+  priority                    = 130 + count.index
   direction                   = "Outbound"
   access                      = "Allow"
   protocol                    = "*"
   source_port_range           = "*"
   destination_port_range      = "*"
-  source_address_prefix       = azurerm_subnet.private[*].address_prefixes
-  destination_address_prefix  = "Internet"
+  source_address_prefix       = azurerm_subnet.private[count.index].address_prefixes[0]
+  destination_address_prefix  = "13.107.6.152/31"  # Replace this with the appropriate IP range
+
   resource_group_name         = azurerm_resource_group.example.name
   network_security_group_name = azurerm_network_security_group.example.name
-}
-
-module "blob_storage" {
-  source               = "../blob-storage"  # Update the path accordingly
-  resource_group_name  = var.blob_storage_resource_group_name
-  storage_account_name = var.blob_storage_account_name
-  location             = var.location
-}
-
-output "public_subnet_ids" {
-  value = azurerm_subnet.public[*].id
-}
-
-output "private_subnet_ids" {
-  value = azurerm_subnet.private[*].id
 }
