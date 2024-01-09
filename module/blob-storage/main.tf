@@ -25,7 +25,3 @@ resource "azurerm_storage_blob" "example" {
 
   source = var.local_file_path
 }
-
-output "storage_account_id" {
-  value = azurerm_storage_account.example.id
-}
