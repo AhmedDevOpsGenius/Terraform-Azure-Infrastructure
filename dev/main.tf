@@ -33,3 +33,9 @@ module "vmss" {
   vmss_name            = "devops-amir-dev-vmss"  
   vmss_instance_count  = 3  # Update with the desired number of instances in the VMSS
 }
+module "acr" {
+  source             = "../module/acr"
+  resource_group_name = "devops-amir-dev-rg"
+  location           = "East US 2"
+  acr_name           = "devopsamirdevacr"  # Update with your desired ACR name
+}
