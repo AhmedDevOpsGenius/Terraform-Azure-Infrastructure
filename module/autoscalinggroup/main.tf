@@ -1,20 +1,18 @@
- provider "azurerm" {
-  features {}
-}
-
-# 1. Set up VNet
+# Create a Resource Group
 resource "azurerm_resource_group" "main" {
   name     = "myResourceGroup"
   location = "East US"
 }
 
+# Create a Virtual Network
 resource "azurerm_virtual_network" "main" {
-  name                = "myVnet"
+  name                = "myVNet"
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# Create a Subnet
 resource "azurerm_subnet" "main" {
   name                 = "mySubnet"
   resource_group_name  = azurerm_resource_group.main.name
@@ -22,15 +20,65 @@ resource "azurerm_subnet" "main" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# 2. Set up Autoscaling Group (VMSS)
+# Create a Public IP for the Load Balancer
+resource "azurerm_public_ip" "main" {
+  name                = "myPublicIP"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+# Create a Load Balancer
+resource "azurerm_lb" "main" {
+  name                = "myLoadBalancer"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  sku                 = "Standard"
+
+  frontend_ip_configuration {
+    name                 = "myFrontendConfig"
+    public_ip_address_id = azurerm_public_ip.main.id
+  }
+}
+
+# Create a Backend Address Pool
+resource "azurerm_lb_backend_address_pool" "main" {
+  name            = "myBackendPool"
+  loadbalancer_id = azurerm_lb.main.id
+}
+
+# Create a Load Balancer Probe
+resource "azurerm_lb_probe" "main" {
+  name            = "httpProbe"
+  loadbalancer_id = azurerm_lb.main.id
+  protocol        = "Tcp"
+  port            = 80
+}
+
+# Create a Load Balancer Rule
+resource "azurerm_lb_rule" "main" {
+  name                            = "httpRule"
+  loadbalancer_id                 = azurerm_lb.main.id
+  protocol                        = "Tcp"
+  frontend_port                   = 80
+  backend_port                    = 80
+  frontend_ip_configuration_name  = azurerm_lb.main.frontend_ip_configuration[0].name
+  backend_address_pool_ids        = [azurerm_lb_backend_address_pool.main.id]
+  probe_id                        = azurerm_lb_probe.main.id
+  enable_floating_ip              = false
+  idle_timeout_in_minutes         = 4
+}
+
+# Create a Virtual Machine Scale Set
 resource "azurerm_linux_virtual_machine_scale_set" "main" {
   name                = "myVMSS"
-  resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
   sku                 = "Standard_DS1_v2"
-  instances           = 2
-  admin_username      = "adminuser"
-  admin_password      = "P@ssw0rd1234!"
+  instances           = 1
+  admin_username      = "azureuser"
+  admin_password      = "P@ssw0rd1234!" 
 
   source_image_reference {
     publisher = "Canonical"
@@ -50,36 +98,42 @@ resource "azurerm_linux_virtual_machine_scale_set" "main" {
 
     ip_configuration {
       name      = "myIPConfig"
-      primary   = true
       subnet_id = azurerm_subnet.main.id
+
+      load_balancer_backend_address_pool_ids = [
+        azurerm_lb_backend_address_pool.main.id
+      ]
     }
   }
 
-  # Deploy a test application
-  custom_data = <<-EOF
-    #!/bin/bash
-    sudo apt-get update
-    sudo apt-get install -y nginx
-    echo "Hello, World from VMSS!" > /var/www/html/index.html
-  EOF
+  
+  disable_password_authentication = false
 
   upgrade_mode = "Manual"
+
+  custom_data = base64encode(<<-EOF
+              #!/bin/bash
+              sudo apt-get update
+              sudo apt-get install -y nginx
+              sudo systemctl start nginx
+              sudo systemctl enable nginx
+              EOF
+  )
 }
 
-# Scaling Policies
-resource "azurerm_monitor_autoscale_setting" "autoscale" {
+# Autoscale Settings
+resource "azurerm_monitor_autoscale_setting" "main" {
   name                = "autoscaleSetting"
+  location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   target_resource_id  = azurerm_linux_virtual_machine_scale_set.main.id
-  enabled             = true
 
   profile {
-    name = "defaultProfile"
-
+    name = "AutoScaleProfile"
     capacity {
-      minimum = 2
+      default = 1
+      minimum = 1
       maximum = 5
-      default = 2
     }
 
     rule {
@@ -87,9 +141,9 @@ resource "azurerm_monitor_autoscale_setting" "autoscale" {
         metric_name        = "Percentage CPU"
         metric_resource_id = azurerm_linux_virtual_machine_scale_set.main.id
         operator           = "GreaterThan"
-        statistic          = "Average"
         threshold          = 60
         time_grain         = "PT1M"
+        statistic          = "Average"
         time_window        = "PT5M"
         time_aggregation   = "Average"
       }
@@ -97,63 +151,29 @@ resource "azurerm_monitor_autoscale_setting" "autoscale" {
       scale_action {
         direction = "Increase"
         type      = "ChangeCount"
-        value     = "1"
+        value     = 1
+        cooldown  = "PT5M"
+      }
+    }
+
+    rule {
+      metric_trigger {
+        metric_name        = "Percentage CPU"
+        metric_resource_id = azurerm_linux_virtual_machine_scale_set.main.id
+        operator           = "LessThan"
+        threshold          = 30
+        time_grain         = "PT1M"
+        statistic          = "Average"
+        time_window        = "PT5M"
+        time_aggregation   = "Average"
+      }
+
+      scale_action {
+        direction = "Decrease"
+        type      = "ChangeCount"
+        value     = 1
         cooldown  = "PT5M"
       }
     }
   }
-}
-
-# 3. Set up Load Balancer
-resource "azurerm_public_ip" "main" {
-  name                = "myPublicIP"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  allocation_method   = "Static"
-}
-
-resource "azurerm_lb" "main" {
-  name                = "myLoadBalancer"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  sku                 = "Standard"
-
-  frontend_ip_configuration {
-    name                 = "LoadBalancerFrontend"
-    public_ip_address_id = azurerm_public_ip.main.id
-  }
-}
-
-resource "azurerm_lb_backend_address_pool" "main" {
-  name                = "myBackendPool"
-  resource_group_name = azurerm_resource_group.main.name
-  loadbalancer_id     = azurerm_lb.main.id
-}
-
-resource "azurerm_lb_probe" "main" {
-  name                            = "myHealthProbe"
-  resource_group_name             = azurerm_resource_group.main.name
-  loadbalancer_id                 = azurerm_lb.main.id
-  protocol                        = "Tcp"
-  port                            = 80
-  interval_in_seconds             = 5
-  number_of_probes                 = 2
-}
-
-resource "azurerm_lb_rule" "main" {
-  name                             = "httpRule"
-  resource_group_name              = azurerm_resource_group.main.name
-  loadbalancer_id                  = azurerm_lb.main.id
-  protocol                         = "Tcp"
-  frontend_port                    = 80
-  backend_port                     = 80
-  frontend_ip_configuration_name   = "LoadBalancerFrontend"
-  backend_address_pool_id          = azurerm_lb_backend_address_pool.main.id
-  probe_id                         = azurerm_lb_probe.main.id
-}
-
-# Associate the Scale Set with the Load Balancer
-resource "azurerm_virtual_machine_scale_set_backend_address_pool_association" "main" {
-  virtual_machine_scale_set_id = azurerm_linux_virtual_machine_scale_set.main.id
-  backend_address_pool_id      = azurerm_lb_backend_address_pool.main.id
 }
